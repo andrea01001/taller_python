@@ -1,0 +1,104 @@
+#gran inspiracion: tacosdedatos, web de spotipy, documentacion de spotipy
+#muy importante el variable explorer
+#import pandas as pd
+import spotipy
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np #no hace falta añadirlo
+from spotipy.oauth2 import SpotifyClientCredentials
+
+am_uri = 'spotify:artist:7Ln80lUS6He07XvHI8qqHH'
+
+
+client_id='5e34a965659d423a8cea0a13ac439462'
+#usamos un fichero con el client secret
+#este fichero está guardado en mi dispositivo y contiene el client secret únicamente
+with open('clientcredentials.txt', 'r') as fich:
+    client_secret=fich.read()
+#casting para que no salga client_secret error
+client_secret=str(client_secret) 
+
+spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(client_id, client_secret))
+results = spotify.artist_albums(am_uri, album_type='album')
+
+
+#hago una tabla vacía
+
+albums = results['items']
+while results['next']:
+    results = spotify.next(results)
+    albums.extend(results['items'])
+
+lista_canciones=[]
+song_uri=[]
+lista_albumes=[]
+lista_popularidades=[]
+lista_fecha=[]
+for album in albums:
+    if album['uri']!= 'spotify:album:7Heaa0B4KOxdWhSICTR2wE': #puse este if para que no me apareciera uno de los álbumes (es un poco arcaico)
+        results2=spotify.album_tracks(album['uri'])
+        songs=results2['items']
+        while results2['next']:
+            results2=spotify.next(results2)
+            songs.extend(results['items'])
+            
+        for track in songs:
+            lista_canciones.append(track['name'])
+            lista_albumes.append(album['name'])
+            song_uri.append(track['uri'])
+            
+#GRACIAS https://medium.com/@michaelmiller0998/extracting-song-data-from-spotify-using-spotipy-167728d0a924
+#lista de features
+duration=[]
+energia=[]
+loudness=[]
+instrumental=[]
+tonalidad=[]
+tempo=[]
+texto=[]
+for i in song_uri:
+    popu=spotify.track(i)
+    lista_popularidades.append(popu['popularity'])
+    
+    features=spotify.audio_features(i)[0]
+    duration.append(features['duration_ms'])
+    energia.append(features['energy'])
+    loudness.append(features['loudness'])
+    instrumental.append(features['instrumentalness'])
+    tonalidad.append(features['key'])
+    tempo.append(features['tempo'])
+    texto.append(features['speechiness'])
+    
+
+tabla=pd.DataFrame({'cancion': lista_canciones, 'album': lista_albumes, 'popularidad': lista_popularidades, 'Duracion (ms)': duration, 'Energia': energia, 'Loudness': loudness, 'Instrumental': instrumental, 'Clave': tonalidad, 'Tempo': tempo, 'Speechiness': texto})
+
+annotations=tabla['cancion']
+
+#graficas de barras
+fig, ax=plt.subplots(figsize=(100,100))
+ax.barh(tabla['cancion'], tabla['popularidad'])
+plt.show()
+
+fig, bx= plt.subplots()
+bx.barh(tabla['album'], tabla['popularidad'])
+plt.show()
+
+#graficas de puntos
+campos=['Duracion (ms)', 'Energia', 'Loudness', 'Clave', 'Tempo', 'Speechiness']
+
+for c in campos:
+    plt.figure(figsize=(30,30))
+    plt.scatter(tabla[c], tabla['popularidad'], marker='*', c='r',s=300)#s para agrandar el punto
+    
+    
+    plt.xlabel(c)   
+    plt.ylabel('Popularidad')
+
+
+    #esto es para nombrar cada punto
+    x=tabla[c]
+    y=tabla['popularidad']
+
+    for i, label in enumerate(annotations):
+        plt.annotate(label, (x[i], y[i]))
+    plt.show()
